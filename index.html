@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1194, initial-scale=1">
+<title>Sojao — Bedroom Simulation</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy: #1a2744; --navy-dark: #0f1a2e; --cream: #f0ebe0;
+    --gold: #c8a882; --gold-dark: #b8966e; --sage: #7a9e7e;
+    --muted: #7a7870; --border: rgba(44,44,42,0.14); --white: #ffffff; --text: #2c2c2a;
+  }
+  html, body { width: 100vw; height: 100vh; overflow: hidden; font-family: 'DM Sans', sans-serif; background: var(--cream); }
+  #root { width: 1194px; height: 834px; position: absolute; top: 0; left: 0; transform-origin: top left; overflow: hidden; }
+
+  .screen { position: absolute; inset: 0; width: 1194px; height: 834px; background: var(--cream); display: flex; flex-direction: column; opacity: 0; pointer-events: none; transition: opacity 0.35s cubic-bezier(0.4,0,0.2,1); overflow: hidden; }
+  .screen.active { opacity: 1; pointer-events: all; }
+
+  .topbar { background: var(--navy); height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 32px; flex-shrink: 0; }
+  .logo { font-size: 18px; font-weight: 500; letter-spacing: 0.22em; color: #fff; }
+  .step-dots { display: flex; gap: 8px; align-items: center; }
+  .dot { height: 7px; width: 7px; border-radius: 4px; background: rgba(255,255,255,0.3); transition: all 0.4s ease; }
+  .dot.active { width: 24px; background: var(--gold); }
+  .dot.done { background: rgba(255,255,255,0.6); }
+
+  .body { flex: 1; overflow: hidden; display: flex; flex-direction: column; padding: 20px 40px 0; }
+  .step-label { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold-dark); font-weight: 500; text-align: right; margin-bottom: 4px; }
+  .screen-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; color: var(--navy); line-height: 1.15; margin-bottom: 4px; }
+  .screen-sub { font-size: 13px; color: var(--muted); margin-bottom: 14px; line-height: 1.4; }
+  .divider { height: 1px; background: var(--border); margin-bottom: 14px; }
+  .section-label { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); font-weight: 500; margin-bottom: 10px; }
+
+  .footer { padding: 10px 40px 18px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+  .btn-primary { background: var(--navy); color: #fff; border: none; border-radius: 10px; height: 48px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s ease; }
+  .btn-primary:hover { background: var(--navy-dark); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(26,39,68,0.25); }
+  .btn-secondary { background: transparent; color: var(--muted); border: 1px solid var(--border); border-radius: 10px; height: 40px; font-family: 'DM Sans', sans-serif; font-size: 13px; cursor: pointer; transition: all 0.2s ease; }
+  .btn-secondary:hover { border-color: var(--navy); color: var(--navy); transform: translateY(-1px); }
+
+  /* SCREEN 1 */
+  .colour-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin-bottom: 12px; }
+  .swatch { aspect-ratio: 1; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: all 0.2s ease; }
+  .swatch:hover { transform: scale(1.12); }
+  .swatch.selected { border-color: var(--navy); box-shadow: 0 0 0 2px var(--cream), 0 0 0 4px var(--navy); }
+  .custom-row { background: var(--white); border: 1px solid var(--border); border-radius: 10px; height: 44px; display: flex; align-items: center; padding: 0 16px; margin-bottom: 14px; gap: 10px; transition: border-color 0.2s; }
+  .custom-row:hover { border-color: var(--gold); }
+  .custom-row label { font-size: 12px; color: var(--muted); flex: 1; cursor: pointer; }
+  .custom-row input[type="color"] { width: 30px; height: 30px; border: none; border-radius: 50%; cursor: pointer; padding: 0; background: none; }
+  .lighting-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .lighting-btn { background: var(--white); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; cursor: pointer; text-align: left; transition: all 0.22s ease; font-family: 'DM Sans', sans-serif; }
+  .lighting-btn:hover { border-color: var(--navy); transform: translateY(-2px); box-shadow: 0 4px 14px rgba(26,39,68,0.1); }
+  .lighting-btn.selected { background: var(--navy); border-color: var(--navy); }
+  .lighting-btn.selected .lb-name { color: #fff; }
+  .lighting-btn.selected .lb-desc { color: rgba(255,255,255,0.6); }
+  .lb-name { font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 3px; display: block; }
+  .lb-desc { font-size: 11px; color: var(--muted); display: block; }
+
+  /* SCREEN 2 */
+  .fabric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 12px; }
+  .fabric-card { background: var(--white); border: 1.5px solid var(--border); border-radius: 14px; padding: 16px; cursor: pointer; transition: all 0.22s ease; overflow: hidden; }
+  .fabric-card:hover { border-color: var(--gold); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(26,39,68,0.08); }
+  .fabric-card.selected { border-color: var(--navy); border-width: 2.5px; }
+  .fabric-card.selected:hover { border-color: var(--navy); }
+  .fabric-texture { width: 100%; height: 76px; border-radius: 8px; margin-bottom: 10px; position: relative; overflow: hidden; }
+  .fabric-texture.sateen { background: #e8e0d5; }
+  .fabric-texture.percale { background: #f2f0ec; }
+  svg.texture { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .fabric-selected-tag { font-size: 11px; font-weight: 500; color: var(--gold-dark); margin-bottom: 4px; min-height: 16px; }
+  .fabric-name { font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 600; color: var(--navy); margin-bottom: 4px; }
+  .fabric-desc { font-size: 12px; color: var(--muted); margin-bottom: 8px; line-height: 1.4; }
+  .fabric-specs { display: flex; flex-direction: column; gap: 2px; }
+  .fabric-spec { font-size: 11px; color: var(--sage); }
+  .quiz-banner { background: rgba(200,168,130,0.1); border: 1px solid rgba(200,168,130,0.35); border-radius: 10px; padding: 12px 16px; display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+  .quiz-text { flex: 1; }
+  .quiz-text p { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 2px; }
+  .quiz-text span { font-size: 11px; color: var(--muted); }
+  .quiz-btn { background: var(--gold); color: #fff; border: none; border-radius: 8px; padding: 9px 16px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+  .quiz-btn:hover { background: var(--gold-dark); transform: translateY(-1px); }
+  .swatches-note { font-size: 12px; color: var(--muted); padding-top: 10px; border-top: 1px solid var(--border); }
+
+  /* SCREEN 3 */
+  .ar-steps { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+  .ar-step { background: var(--white); border: 1px solid var(--border); border-radius: 10px; padding: 13px 16px; display: flex; align-items: center; gap: 14px; transition: all 0.2s; }
+  .ar-step:hover { border-color: rgba(26,39,68,0.25); box-shadow: 0 2px 10px rgba(26,39,68,0.06); }
+  .ar-num { width: 26px; height: 26px; background: var(--navy); color: #fff; border-radius: 50%; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .ar-step-text { font-size: 13px; color: var(--text); line-height: 1.4; }
+  .launch-btn { background: var(--navy); color: #fff; border: none; border-radius: 10px; height: 52px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 500; cursor: pointer; transition: all 0.22s ease; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; }
+  .launch-btn:hover { background: var(--navy-dark); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(26,39,68,0.28); }
+  .launch-arrow { font-size: 18px; transition: transform 0.2s; }
+  .launch-btn:hover .launch-arrow { transform: translateX(4px); }
+
+  /* SCREEN 4 */
+  .s4-layout { display: grid; grid-template-columns: 1fr 300px; gap: 24px; flex: 1; overflow: hidden; }
+  .summary-card { background: var(--white); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
+  .summary-card-title { font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 600; color: var(--navy); margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  .summary-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 13px; }
+  .summary-row-label { color: var(--muted); }
+  .summary-row-value { color: var(--text); font-weight: 500; text-align: right; }
+  .summary-divider { height: 1px; background: var(--border); margin: 6px 0; }
+  .colour-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.1); margin-right: 5px; vertical-align: middle; }
+  .cta-question { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .cta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .cta-card { border-radius: 10px; padding: 18px 16px; cursor: pointer; transition: all 0.22s ease; border: 1.5px solid transparent; }
+  .cta-card:hover { transform: translateY(-2px); }
+  .cta-card.primary { background: var(--navy); border-color: var(--navy); }
+  .cta-card.primary:hover { background: var(--navy-dark); box-shadow: 0 8px 24px rgba(26,39,68,0.25); }
+  .cta-card.primary .cta-title { color: #fff; }
+  .cta-card.primary .cta-sub { color: rgba(255,255,255,0.6); }
+  .cta-card.secondary { background: var(--white); border-color: var(--navy); }
+  .cta-card.secondary:hover { box-shadow: 0 6px 18px rgba(26,39,68,0.1); }
+  .cta-card.secondary .cta-title { color: var(--navy); }
+  .cta-card.secondary .cta-sub { color: var(--muted); }
+  .cta-title { font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 700; margin-bottom: 4px; display: block; }
+  .cta-sub { font-size: 12px; display: block; }
+  .save-note { font-size: 11px; color: var(--sage); text-align: center; margin-top: 8px; }
+  .end-session-btn { width: 100%; background: transparent; border: 2px solid var(--navy); border-radius: 10px; height: 46px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; color: var(--navy); cursor: pointer; transition: all 0.22s ease; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; }
+  .end-session-btn:hover { background: var(--navy); color: #fff; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(26,39,68,0.2); }
+  .details-col { display: flex; flex-direction: column; gap: 11px; }
+  .details-label { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); font-weight: 500; margin-bottom: 2px; }
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+  .form-label { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+  .form-input { background: var(--white); border: 1px solid var(--border); border-radius: 9px; height: 40px; padding: 0 14px; font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--text); outline: none; transition: border-color 0.2s; width: 100%; }
+  .form-input:focus { border-color: var(--gold); }
+  .form-input::placeholder { color: rgba(122,120,112,0.45); }
+  .size-row { display: flex; gap: 8px; align-items: flex-end; }
+  .size-guide-link { font-size: 11px; color: var(--gold-dark); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; padding-bottom: 10px; white-space: nowrap; }
+
+  /* CONFIRMATION OVERLAY */
+  .confirm-overlay { position: absolute; inset: 0; background: rgba(15,26,46,0.6); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.35s ease; z-index: 100; }
+  .confirm-overlay.active { opacity: 1; pointer-events: all; }
+  .confirm-sheet { background: #fff; border-radius: 20px; width: 500px; overflow: hidden; transform: translateY(24px); transition: transform 0.38s cubic-bezier(0.34,1.56,0.64,1); box-shadow: 0 24px 60px rgba(0,0,0,0.3); }
+  .confirm-overlay.active .confirm-sheet { transform: translateY(0); }
+  .confirm-header { background: var(--navy); padding: 20px 28px; text-align: center; }
+  .confirm-logo { font-size: 20px; font-weight: 500; letter-spacing: 0.22em; color: #fff; font-family: 'DM Sans', sans-serif; }
+  .confirm-body { padding: 22px 28px 24px; }
+  .confirm-order-title { font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 700; color: var(--navy); margin-bottom: 3px; }
+  .confirm-order-sub { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+  .confirm-divider { height: 1px; background: var(--border); margin: 10px 0; }
+  .confirm-row { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; }
+  .confirm-row-label { color: var(--muted); }
+  .confirm-row-value { color: var(--text); font-weight: 500; text-align: right; }
+  .confirm-qr-section { text-align: center; margin-top: 14px; }
+  .confirm-qr-label { font-size: 12px; font-weight: 600; color: var(--navy); letter-spacing: 0.05em; margin-bottom: 10px; }
+  .qr-box { width: 100px; height: 100px; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; }
+  .session-id { font-size: 13px; font-weight: 600; color: var(--navy); letter-spacing: 0.04em; margin-bottom: 12px; }
+  .confirm-barcode { width: 100%; height: 26px; margin: 0 0 14px; background: repeating-linear-gradient(90deg,#1a2744 0,#1a2744 2px,transparent 2px,transparent 4px,#1a2744 4px,#1a2744 5px,transparent 5px,transparent 8px,#1a2744 8px,#1a2744 11px,transparent 11px,transparent 13px,#1a2744 13px,#1a2744 14px,transparent 14px,transparent 17px,#1a2744 17px,#1a2744 20px,transparent 20px,transparent 22px,#1a2744 22px,#1a2744 23px,transparent 23px,transparent 26px); border-radius: 2px; opacity: 0.8; }
+  .confirm-done-btn { width: 100%; background: var(--navy); color: #fff; border: none; border-radius: 10px; height: 44px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+  .confirm-done-btn:hover { background: var(--navy-dark); }
+
+  @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .screen.active .body, .screen.active .footer { animation: slideUp 0.38s ease both; }
+  .screen.active .footer { animation-delay: 0.05s; }
+</style>
+</head>
+<body>
+<div id="root">
+
+  <!-- SCREEN 1 -->
+  <div class="screen active" id="screen1">
+    <div class="topbar">
+      <span class="logo">SOJAO</span>
+      <div class="step-dots"><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+    </div>
+    <div class="body">
+      <div class="step-label">STEP 1 OF 4</div>
+      <div class="screen-title">Make this Your Space</div>
+      <div class="screen-sub">Choose your wall colour and lighting to match your room.</div>
+      <div class="divider"></div>
+      <div class="section-label">Wall Colour</div>
+      <div class="colour-grid" id="colour-grid"></div>
+      <div class="custom-row">
+        <label for="custom-colour">Custom colour — pick from colour wheel</label>
+        <input type="color" id="custom-colour" value="#f0ebe0" oninput="setCustomColour(this.value)">
+      </div>
+      <div class="section-label">Lighting</div>
+      <div class="lighting-grid">
+        <button class="lighting-btn selected" onclick="selectLighting(this,'Warm')"><span class="lb-name">Warm</span><span class="lb-desc">Cosy glow</span></button>
+        <button class="lighting-btn" onclick="selectLighting(this,'Daylight')"><span class="lb-name">Daylight</span><span class="lb-desc">Natural light</span></button>
+        <button class="lighting-btn" onclick="selectLighting(this,'Cool')"><span class="lb-name">Cool</span><span class="lb-desc">Crisp &amp; bright</span></button>
+      </div>
+    </div>
+    <div class="footer"><button class="btn-primary" onclick="goTo(2)">Continue to Fabric Selection &nbsp;→</button></div>
+  </div>
+
+  <!-- SCREEN 2 -->
+  <div class="screen" id="screen2">
+    <div class="topbar">
+      <span class="logo">SOJAO</span>
+      <div class="step-dots"><div class="dot done"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div></div>
+    </div>
+    <div class="body">
+      <div class="step-label">STEP 2 OF 4</div>
+      <div class="screen-title">Evaluate Fabrics by Touch</div>
+      <div class="screen-sub">Feel the samples beside you, then select your preferred fabric below.</div>
+      <div class="divider"></div>
+      <div class="section-label">Fabric Type</div>
+      <div class="fabric-grid">
+        <div class="fabric-card selected" id="card-sateen" onclick="selectFabric('sateen')">
+          <div class="fabric-texture sateen">
+            <svg class="texture" viewBox="0 0 400 76" preserveAspectRatio="none">
+              <line x1="0" y1="13" x2="400" y2="13" stroke="#d4c9b8" stroke-width="1.5"/>
+              <line x1="0" y1="26" x2="400" y2="26" stroke="#d4c9b8" stroke-width="1.5"/>
+              <line x1="0" y1="39" x2="400" y2="39" stroke="#d4c9b8" stroke-width="1.5"/>
+              <line x1="0" y1="52" x2="400" y2="52" stroke="#d4c9b8" stroke-width="1.5"/>
+              <line x1="0" y1="65" x2="400" y2="65" stroke="#d4c9b8" stroke-width="1.5"/>
+            </svg>
+          </div>
+          <div class="fabric-selected-tag" id="sateen-tag">● Selected</div>
+          <div class="fabric-name">Classic Sateen</div>
+          <div class="fabric-desc">Buttery smooth, temperature-regulating organic cotton.</div>
+          <div class="fabric-specs">
+            <span class="fabric-spec">Best for: Year-round use</span>
+            <span class="fabric-spec">Thread count: 400TC GOTS</span>
+            <span class="fabric-spec">Feel: Silky smooth</span>
+          </div>
+        </div>
+        <div class="fabric-card" id="card-percale" onclick="selectFabric('percale')">
+          <div class="fabric-texture percale">
+            <svg class="texture" viewBox="0 0 400 76" preserveAspectRatio="none">
+              <line x1="0" y1="10" x2="400" y2="10" stroke="#e0ddd8" stroke-width="1"/>
+              <line x1="0" y1="20" x2="400" y2="20" stroke="#e0ddd8" stroke-width="1"/>
+              <line x1="0" y1="30" x2="400" y2="30" stroke="#e0ddd8" stroke-width="1"/>
+              <line x1="0" y1="40" x2="400" y2="40" stroke="#e0ddd8" stroke-width="1"/>
+              <line x1="0" y1="50" x2="400" y2="50" stroke="#e0ddd8" stroke-width="1"/>
+              <line x1="0" y1="60" x2="400" y2="60" stroke="#e0ddd8" stroke-width="1"/>
+              <line x1="0" y1="70" x2="400" y2="70" stroke="#e0ddd8" stroke-width="1"/>
+              <line x1="40" y1="0" x2="40" y2="76" stroke="#e0ddd8" stroke-width="1"/>
+              <line x1="80" y1="0" x2="80" y2="76" stroke="#e0ddd8" stroke-width="1"/>
+              <line x1="120" y1="0" x2="120" y2="76" stroke="#e0ddd8" stroke-width="1"/>
+              <line x1="160" y1="0" x2="160" y2="76" stroke="#e0ddd8" stroke-width="1"/>
+              <line x1="200" y1="0" x2="200" y2="76" stroke="#e0ddd8" stroke-width="1"/>
+              <line x1="240" y1="0" x2="240" y2="76" stroke="#e0ddd8" stroke-width="1"/>
+              <line x1="280" y1="0" x2="280" y2="76" stroke="#e0ddd8" stroke-width="1"/>
+              <line x1="320" y1="0" x2="320" y2="76" stroke="#e0ddd8" stroke-width="1"/>
+              <line x1="360" y1="0" x2="360" y2="76" stroke="#e0ddd8" stroke-width="1"/>
+            </svg>
+          </div>
+          <div class="fabric-selected-tag" id="percale-tag" style="color:transparent;">● Selected</div>
+          <div class="fabric-name">Crisp Percale</div>
+          <div class="fabric-desc">Extra breathable, lightweight cotton. Cool-to-touch.</div>
+          <div class="fabric-specs">
+            <span class="fabric-spec">Best for: Hot sleepers</span>
+            <span class="fabric-spec">Thread count: 200TC GOTS</span>
+            <span class="fabric-spec">Feel: Crisp, cool</span>
+          </div>
+        </div>
+      </div>
+      <div class="quiz-banner">
+        <div class="quiz-text">
+          <p>Not sure which fabric suits you?</p>
+          <span>Take our personalised sleep quiz → sojao.shop/pages/take-our-quiz</span>
+        </div>
+        <button class="quiz-btn" onclick="window.open('https://sojao.shop/pages/take-our-quiz','_blank')">Take Quiz →</button>
+      </div>
+      <div class="swatches-note">Sample swatches are available to touch beside this tablet.</div>
+    </div>
+    <div class="footer">
+      <button class="btn-primary" onclick="goTo(3)">Confirm Fabric Selection &nbsp;→</button>
+      <button class="btn-secondary" onclick="goTo(1)">← Back</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 3 -->
+  <div class="screen" id="screen3">
+    <div class="topbar">
+      <span class="logo">SOJAO</span>
+      <div class="step-dots"><div class="dot done"></div><div class="dot done"></div><div class="dot active"></div><div class="dot"></div></div>
+    </div>
+    <div class="body">
+      <div class="step-label">STEP 3 OF 4</div>
+      <div class="screen-title">Visualise Bedding in Your Room</div>
+      <div class="screen-sub">Point your iPad at an open corner to place your bed using AR.</div>
+      <div class="divider"></div>
+      <div class="section-label">How to Use AR</div>
+      <div class="ar-steps">
+        <div class="ar-step"><div class="ar-num">1</div><div class="ar-step-text">Lift your iPad and angle it toward a corner of your room or the projection wall.</div></div>
+        <div class="ar-step"><div class="ar-num">2</div><div class="ar-step-text">Wait for the screen to load — then tap the screen to place the bed.</div></div>
+        <div class="ar-step"><div class="ar-num">3</div><div class="ar-step-text">Select your preferred bedding colour to mix and match.</div></div>
+        <div class="ar-step"><div class="ar-num">4</div><div class="ar-step-text">Return to this screen when you are done!</div></div>
+      </div>
+      <button class="launch-btn" onclick="window.open('https://ar.blippar.com/w7pgsz1pbwt2k8x6svpfghe891qf5ghm7ancc7r8','_blank')">
+        Launch AR Projection <span class="launch-arrow">→</span>
+      </button>
+    </div>
+    <div class="footer">
+      <button class="btn-primary" onclick="goTo(4)">You're almost there, just one last step! &nbsp;→</button>
+      <button class="btn-secondary" onclick="goTo(2)">← Back</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 4 -->
+  <div class="screen" id="screen4">
+    <div class="topbar">
+      <span class="logo">SOJAO</span>
+      <div class="step-dots"><div class="dot done"></div><div class="dot done"></div><div class="dot done"></div><div class="dot active"></div></div>
+    </div>
+    <div class="body" style="overflow:hidden;">
+      <div class="step-label">STEP 4 OF 4</div>
+      <div class="screen-title">Review &amp; Confirm</div>
+      <div class="screen-sub">Your selections are saved. Enter your details to checkout or save for later.</div>
+      <div class="divider"></div>
+      <div class="s4-layout">
+        <div>
+          <div class="summary-card">
+            <div class="summary-card-title">Your Bedding Configuration</div>
+            <div class="summary-row"><span class="summary-row-label">Duvet Cover</span><span class="summary-row-value" id="sum-duvet">Navy · Classic Sateen</span></div>
+            <div class="summary-row"><span class="summary-row-label">Fitted Sheet</span><span class="summary-row-value" id="sum-sheet">Moss · Classic Sateen</span></div>
+            <div class="summary-row"><span class="summary-row-label">Pillow Case Pair</span><span class="summary-row-value" id="sum-pillow">Cedar · Classic Sateen</span></div>
+            <div class="summary-divider"></div>
+            <div class="summary-row"><span class="summary-row-label">Wall colour</span><span class="summary-row-value"><span class="colour-dot" id="wall-dot" style="background:#f0ebe0;"></span><span id="sum-wall">Warm White</span></span></div>
+            <div class="summary-row"><span class="summary-row-label">Lighting</span><span class="summary-row-value" id="sum-lighting">Warm lighting</span></div>
+          </div>
+          <div style="margin-top:12px;">
+            <div class="cta-question">What would you like to do?</div>
+            <div class="cta-grid">
+              <div class="cta-card primary" onclick="endSession()"><span class="cta-title">Check Out Now</span><span class="cta-sub">Purchase immediately</span></div>
+              <div class="cta-card secondary" onclick="endSession()"><span class="cta-title">Save for Later</span><span class="cta-sub">We'll email your selections</span></div>
+            </div>
+            <div class="save-note">Your configuration can be retrieved at any time at sojao.shop</div>
+            <button class="end-session-btn" onclick="endSession()">✓ &nbsp;End Session &amp; Send Confirmation</button>
+          </div>
+        </div>
+        <div class="details-col">
+          <div class="details-label">Your Details</div>
+          <div class="form-group"><label class="form-label">Name</label><input class="form-input" id="field-name" type="text" placeholder="e.g. Sarah Tan"></div>
+          <div class="form-group"><label class="form-label">Phone Number</label><input class="form-input" id="field-phone" type="tel" placeholder="e.g. +65 9123 4567"></div>
+          <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="field-email" type="email" placeholder="hello@example.com"></div>
+          <div class="form-group">
+            <label class="form-label">Bedding Size</label>
+            <div class="size-row">
+              <div class="form-group" style="flex:1;"><select class="form-input" id="field-size" style="cursor:pointer;"><option value="">Select Size</option><option>Single</option><option>Double</option><option>Queen</option><option>King</option><option>Super King</option></select></div>
+              <span class="size-guide-link">Size Guide</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="footer"><button class="btn-secondary" onclick="goTo(3)">← Back to AR Visualisation</button></div>
+  </div>
+
+  <!-- CONFIRMATION OVERLAY -->
+  <div class="confirm-overlay" id="confirm-overlay">
+    <div class="confirm-sheet">
+      <div class="confirm-header"><div class="confirm-logo">SOJAO</div></div>
+      <div class="confirm-body">
+        <div class="confirm-order-title" id="conf-title">Order Details for Sarah Tan, +65 9123 4567</div>
+        <div class="confirm-order-sub">A confirmation has been sent to your email.</div>
+        <div class="confirm-divider"></div>
+        <div class="confirm-row"><span class="confirm-row-label">Duvet Cover</span><span class="confirm-row-value" id="conf-duvet"></span></div>
+        <div class="confirm-row"><span class="confirm-row-label">Fitted Sheet</span><span class="confirm-row-value" id="conf-sheet"></span></div>
+        <div class="confirm-row"><span class="confirm-row-label">Pillow Case Pair</span><span class="confirm-row-value" id="conf-pillow"></span></div>
+        <div class="confirm-row"><span class="confirm-row-label">Bedding Size</span><span class="confirm-row-value" id="conf-size"></span></div>
+        <div class="confirm-divider"></div>
+        <div class="confirm-qr-section">
+          <div class="confirm-qr-label">Session QR — Scan at Counter</div>
+          <div class="qr-box">
+            <svg width="96" height="96" viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg">
+              <rect width="90" height="90" fill="white"/>
+              <rect x="5" y="5" width="26" height="26" fill="#1a2744" rx="2"/><rect x="9" y="9" width="18" height="18" fill="white" rx="1"/><rect x="13" y="13" width="10" height="10" fill="#1a2744"/>
+              <rect x="59" y="5" width="26" height="26" fill="#1a2744" rx="2"/><rect x="63" y="9" width="18" height="18" fill="white" rx="1"/><rect x="67" y="13" width="10" height="10" fill="#1a2744"/>
+              <rect x="5" y="59" width="26" height="26" fill="#1a2744" rx="2"/><rect x="9" y="63" width="18" height="18" fill="white" rx="1"/><rect x="13" y="67" width="10" height="10" fill="#1a2744"/>
+              <rect x="37" y="5" width="4" height="4" fill="#1a2744"/><rect x="43" y="5" width="4" height="4" fill="#1a2744"/><rect x="49" y="5" width="4" height="4" fill="#1a2744"/>
+              <rect x="37" y="11" width="4" height="4" fill="#1a2744"/><rect x="49" y="17" width="4" height="4" fill="#1a2744"/><rect x="43" y="23" width="4" height="4" fill="#1a2744"/>
+              <rect x="5" y="37" width="4" height="4" fill="#1a2744"/><rect x="17" y="43" width="4" height="4" fill="#1a2744"/><rect x="11" y="49" width="4" height="4" fill="#1a2744"/>
+              <rect x="37" y="37" width="4" height="4" fill="#1a2744"/><rect x="43" y="37" width="4" height="4" fill="#1a2744"/><rect x="55" y="37" width="4" height="4" fill="#1a2744"/>
+              <rect x="61" y="43" width="4" height="4" fill="#1a2744"/><rect x="67" y="37" width="4" height="4" fill="#1a2744"/><rect x="73" y="43" width="4" height="4" fill="#1a2744"/>
+              <rect x="43" y="49" width="4" height="4" fill="#1a2744"/><rect x="55" y="55" width="4" height="4" fill="#1a2744"/>
+              <rect x="37" y="61" width="4" height="4" fill="#1a2744"/><rect x="49" y="67" width="4" height="4" fill="#1a2744"/>
+              <rect x="61" y="61" width="4" height="4" fill="#1a2744"/><rect x="73" y="67" width="4" height="4" fill="#1a2744"/>
+              <rect x="79" y="37" width="4" height="4" fill="#1a2744"/><rect x="79" y="49" width="4" height="4" fill="#1a2744"/><rect x="79" y="61" width="4" height="4" fill="#1a2744"/>
+            </svg>
+          </div>
+          <div class="session-id" id="conf-session-id">Session ID: SJO-AR-2488</div>
+          <div class="confirm-barcode"></div>
+          <button class="confirm-done-btn" onclick="resetSession()">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+  // Scale to fit
+  function scaleToFit() {
+    var root = document.getElementById('root');
+    var scale = Math.min(window.innerWidth / 1194, window.innerHeight / 834);
+    root.style.transform = 'scale(' + scale + ')';
+    root.style.left = ((window.innerWidth  - 1194 * scale) / 2) + 'px';
+    root.style.top  = ((window.innerHeight - 834  * scale) / 2) + 'px';
+    document.body.style.background = scale < 0.99 ? '#0f0f0f' : 'var(--cream)';
+  }
+  scaleToFit();
+  window.addEventListener('resize', scaleToFit);
+
+  var state = { wallColour: '#f0ebe0', wallName: 'Warm White', lighting: 'Warm', fabric: 'sateen' };
+
+  var wallColours = [
+    { hex: '#ffffff', name: 'White' },
+    { hex: '#e8e0d5', name: 'Linen' },
+    { hex: '#ddd5c8', name: 'Sand' },
+    { hex: '#c8d5c4', name: 'Sage Mist' },
+    { hex: '#c4ccd8', name: 'Pale Blue' },
+    { hex: '#d8d5e0', name: 'Lavender Grey' },
+    { hex: '#e0d8d0', name: 'Greige' },
+    { hex: '#ccc4b8', name: 'Taupe' },
+    { hex: '#b8c4c4', name: 'Sea Mist' },
+    { hex: '#f0e8e0', name: 'Peach Cream' },
+    { hex: '#e8ece8', name: 'Mist Green' },
+    { hex: '#d8dce0', name: 'Cool Linen' },
+    { hex: '#e0e8e4', name: 'Mint White' },
+    { hex: '#f0ece4', name: 'Bone' }
+  ];
+
+  function buildSwatches() {
+    var grid = document.getElementById('colour-grid');
+    wallColours.forEach(function(c, i) {
+      var s = document.createElement('div');
+      s.className = 'swatch' + (i === 0 ? ' selected' : '');
+      s.style.background = c.hex;
+      s.title = c.name;
+      (function(colour, el) {
+        el.onclick = function() {
+          document.querySelectorAll('.swatch').forEach(function(x) { x.classList.remove('selected'); });
+          el.classList.add('selected');
+          state.wallColour = colour.hex;
+          state.wallName   = colour.name;
+          updateSummary();
+        };
+      })(c, s);
+      grid.appendChild(s);
+    });
+  }
+
+  function setCustomColour(hex) {
+    state.wallColour = hex;
+    state.wallName = 'Custom';
+    document.querySelectorAll('.swatch').forEach(function(el) { el.classList.remove('selected'); });
+    updateSummary();
+  }
+
+  function selectLighting(btn, name) {
+    document.querySelectorAll('.lighting-btn').forEach(function(b) { b.classList.remove('selected'); });
+    btn.classList.add('selected');
+    state.lighting = name;
+    updateSummary();
+  }
+
+  function selectFabric(type) {
+    state.fabric = type;
+    var sateen  = document.getElementById('card-sateen');
+    var percale = document.getElementById('card-percale');
+    var sTag    = document.getElementById('sateen-tag');
+    var pTag    = document.getElementById('percale-tag');
+    if (type === 'sateen') {
+      sateen.classList.add('selected');  percale.classList.remove('selected');
+      sTag.style.color = '';             pTag.style.color = 'transparent';
+    } else {
+      percale.classList.add('selected'); sateen.classList.remove('selected');
+      pTag.style.color = '';             sTag.style.color = 'transparent';
+    }
+    updateSummary();
+  }
+
+  function updateSummary() {
+    var f = state.fabric === 'sateen' ? 'Classic Sateen' : 'Crisp Percale';
+    document.getElementById('sum-duvet').textContent    = 'Navy · ' + f;
+    document.getElementById('sum-sheet').textContent    = 'Moss · ' + f;
+    document.getElementById('sum-pillow').textContent   = 'Cedar · ' + f;
+    document.getElementById('sum-wall').textContent     = state.wallName;
+    document.getElementById('sum-lighting').textContent = state.lighting + ' lighting';
+    var dot = document.getElementById('wall-dot');
+    if (dot) dot.style.background = state.wallColour;
+  }
+
+  function goTo(n) {
+    document.querySelectorAll('.screen').forEach(function(s, i) {
+      s.classList.toggle('active', i + 1 === n);
+    });
+  }
+
+  function endSession() {
+    var name  = document.getElementById('field-name').value.trim();
+    var phone = document.getElementById('field-phone').value.trim();
+    var email = document.getElementById('field-email').value.trim();
+    var size  = document.getElementById('field-size').value;
+    var valid = true;
+    if (!name)  { var fn = document.getElementById('field-name');  fn.style.borderColor = '#c8555d'; setTimeout(function(){ fn.style.borderColor = ''; }, 2000); fn.focus(); valid = false; }
+    if (!email) { var fe = document.getElementById('field-email'); fe.style.borderColor = '#c8555d'; setTimeout(function(){ fe.style.borderColor = ''; }, 2000); if (name) fe.focus(); valid = false; }
+    if (!valid) return;
+    var sessionId = 'SJO-AR-' + Math.floor(1000 + Math.random() * 9000);
+    document.getElementById('conf-title').textContent      = 'Order Details for ' + name + (phone ? ', ' + phone : '');
+    document.getElementById('conf-duvet').textContent      = document.getElementById('sum-duvet').textContent;
+    document.getElementById('conf-sheet').textContent      = document.getElementById('sum-sheet').textContent;
+    document.getElementById('conf-pillow').textContent     = document.getElementById('sum-pillow').textContent;
+    document.getElementById('conf-size').textContent       = size ? size + ' size bedding' : 'Size not selected';
+    document.getElementById('conf-session-id').textContent = 'Session ID: ' + sessionId;
+    document.getElementById('confirm-overlay').classList.add('active');
+  if (mode === 'checkout') setTimeout(() => window.open('https://sojao.shop','_blank'), 400);
+  }
+
+  function resetSession() {
+    document.getElementById('confirm-overlay').classList.remove('active');
+    document.getElementById('field-name').value  = '';
+    document.getElementById('field-phone').value = '';
+    document.getElementById('field-email').value = '';
+    document.getElementById('field-size').value  = '';
+    state.wallColour = '#f0ebe0'; state.wallName = 'Warm White';
+    state.lighting = 'Warm'; state.fabric = 'sateen';
+    document.querySelectorAll('.swatch').forEach(function(s, i) { s.classList.toggle('selected', i === 0); });
+    document.querySelectorAll('.lighting-btn').forEach(function(b, i) { b.classList.toggle('selected', i === 0); });
+    selectFabric('sateen');
+    updateSummary();
+    goTo(1);
+  }
+
+  buildSwatches();
+  updateSummary();
+</script>
+</body>
+</html>
